@@ -10,13 +10,13 @@ export class UserController {
         try {
             const userId = req.user?.id;
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('status')
+            const { data: user } = await supabase
+                .from('users')
+                .select('subscription_plan, subscription_expires_at, custom_logo_url, custom_branding_text')
                 .eq('id', userId)
                 .single();
 
-            const plan = profile?.status?.toUpperCase() === 'PRO' ? 'PRO' : 'FREE';
+            const plan = user?.subscription_plan?.toUpperCase() === 'PRO' ? 'PRO' : 'FREE';
 
             const { count: projectCount } = await supabase
                 .from('projects')
@@ -32,9 +32,9 @@ export class UserController {
                 projectCount: count,
                 maxProjects,
                 canCreateProject: count < maxProjects,
-                customLogoUrl: '',
-                customBrandingText: '',
-                subscriptionExpiresAt: null,
+                customLogoUrl: user?.custom_logo_url || '',
+                customBrandingText: user?.custom_branding_text || '',
+                subscriptionExpiresAt: user?.subscription_expires_at || null,
             });
         } catch (error) {
             console.error('[UserController] getSubscription error:', error);
@@ -47,8 +47,11 @@ export class UserController {
             const userId = req.user?.id;
 
             const { error } = await supabase
-                .from('profiles')
-                .update({ status: 'PRO', updated_at: new Date().toISOString() })
+                .from('users')
+                .update({
+                    subscription_plan: 'PRO',
+                    updated_at: new Date().toISOString(),
+                })
                 .eq('id', userId);
 
             if (error) throw error;
@@ -61,6 +64,23 @@ export class UserController {
     }
 
     async updateBranding(req: Request, res: Response) {
-        res.json({ success: true });
+        try {
+            const userId = req.user?.id;
+            const { customLogoUrl, customBrandingText } = req.body;
+
+            await supabase
+                .from('users')
+                .update({
+                    custom_logo_url: customLogoUrl || null,
+                    custom_branding_text: customBrandingText || null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', userId);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error('[UserController] updateBranding error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
     }
 }
