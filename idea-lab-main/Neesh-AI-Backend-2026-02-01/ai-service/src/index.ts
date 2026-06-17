@@ -56,6 +56,16 @@ app.post('/api/projects/:id/chat', (req, res) => chatController.chatWithProject(
 // Public chat endpoint (no auth required)
 app.post('/api/public/projects/:id/chat', (req, res) => chatController.publicChatWithProject(req, res));
 
+// Blog API routes (authenticated)
+import { BlogController } from './controllers/BlogController';
+const blogController = new BlogController();
+
+app.get('/api/projects/:projectId/blog', (req, res) => blogController.getBlog(req, res));
+app.put('/api/projects/:projectId/blog', (req, res) => blogController.upsertBlog(req, res));
+
+// Public blog endpoint (no auth required)
+app.get('/api/public/projects/:projectId/blog', (req, res) => blogController.getPublicBlog(req, res));
+
 // API Key management routes
 import { ApiKeyController } from './controllers/ApiKeyController';
 const apiKeyController = new ApiKeyController();
