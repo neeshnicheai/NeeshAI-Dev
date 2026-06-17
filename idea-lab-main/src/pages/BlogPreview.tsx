@@ -18,6 +18,7 @@ import CommentSection from "@/components/project/CommentSection";
 import { useQuestions } from "@/hooks/useQuestions";
 import apiClient from "@/lib/api";
 import MoreLikeThis from "@/components/project/MoreLikeThis";
+import BlogMetaTags from "@/components/BlogMetaTags";
 
 interface FeedbackFormField {
   id: string;
@@ -668,6 +669,13 @@ const BlogPreview = ({ publicId }: BlogPreviewProps) => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Meta tags for social sharing */}
+      <BlogMetaTags
+        title={blogData?.title || "Untitled Blog"}
+        description={blogData?.sections?.[0]?.content?.substring(0, 160) || "Read this blog on Neesh AI"}
+        imageUrl={blogData?.coverImage || undefined}
+        url={shareableUrl}
+      />
       {/* Reading Progress Bar */}
       <div className="fixed top-0 left-0 right-0 z-[60] h-1">
         <div
@@ -679,7 +687,7 @@ const BlogPreview = ({ publicId }: BlogPreviewProps) => {
       {/* Floating Header */}
       <header className="fixed top-1 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/dashboard">
+          <Link to={publicId ? "/" : "/dashboard"}>
             <NeeshLogo size="sm" />
           </Link>
 
@@ -1138,11 +1146,13 @@ const BlogPreview = ({ publicId }: BlogPreviewProps) => {
               No Blog Content
             </h2>
             <p className="text-muted-foreground mb-6">
-              Start editing your blog to see the preview here.
+              {publicId ? "This blog has no content yet." : "Start editing your blog to see the preview here."}
             </p>
-            <Link to={`/project/${id}?tab=blog`}>
-              <Button className="rounded-2xl">Go to Editor</Button>
-            </Link>
+            {!publicId && (
+              <Link to={`/project/${id}?tab=blog`}>
+                <Button className="rounded-2xl">Go to Editor</Button>
+              </Link>
+            )}
           </div>
         </main>
       )}

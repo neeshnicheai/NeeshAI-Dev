@@ -147,24 +147,47 @@ export const useBlogs = () => {
   };
 
   const getPublicBlog = async (projectId: string): Promise<Blog | null> => {
-    // Current backend doesn't seem to have a specific public blog endpoint separate from authentication?
-    // Actually SecurityConfig says `/api/public/**` is permitted.
-    // ProjecController doesn't have a specific public endpoint for blog content.
-    // PublicProjectController might... let's check or assume standard get with skipAuth?
-    // But standard get /api/projects/{id}/blog checks authentication.
-
-    // For now, try to fetch with skipAuth but it might fail if backend enforces auth on that endpoint.
-    // If it fails, we need to add a public endpoint to backend.
-
     try {
-      // Attempting to fetch, assuming there might be a public endpoint or we can try.
-      // If this fails, we need to update backend.
       console.log(`[useBlogs] Fetching public blog for ${projectId}`);
-      // NOTE: This might need backend update to expose public blog content
       const backendData = await apiClient.get<BackendBlogContent>(`/api/public/projects/${projectId}/blog`, { skipAuth: true });
       return transformBlog(projectId, backendData);
     } catch (err) {
       console.error("[useBlogs] Error fetching public blog:", err);
+      return null;
+    }
+  };
+
+  const getPublicBlogBySlug = async (slug: string): Promise<Blog | null> => {
+    try {
+      console.log(`[useBlogs] Fetching public blog by slug: ${slug}`);
+      const backendData = await apiClient.get<BackendBlogContent>(`/api/public/projects/blog/${slug}`, { skipAuth: true });
+
+      // Extract project ID from slug for transformation
+      const projectId = extractProjectIdFromSlug(slug);
+      if (!projectId) {
+        throw new Error("Invalid slug format");
+      }
+
+      return transformBlog(projectId, backendData);
+    } catch (err) {
+      console.error("[useBlogs] Error fetching public blog by slug:", err);
+      return null;
+    }
+  };
+
+  const extractProjectIdFromSlug = (slug: string): string | null => {
+    try {
+      // Expected format: "some-title-uuid"
+      // UUID format: 8-4-4-4-12 hex characters
+      const uuidPattern = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+      const match = slug.match(uuidPattern);
+
+      if (match && match[1]) {
+        return match[1];
+      }
+      return null;
+    } catch (e) {
+      console.error("Failed to extract UUID from slug:", slug, e);
       return null;
     }
   };
@@ -175,5 +198,6 @@ export const useBlogs = () => {
     getBlog,
     upsertBlog,
     getPublicBlog,
+    getPublicBlogBySlug,
   };
 };
