@@ -33,14 +33,14 @@ export const supabaseAuth = async (req: Request, res: Response, next: NextFuncti
         // Decode the JWT to get user info (Supabase tokens are signed by Supabase)
         const decoded = jwt.decode(token) as any;
 
-        if (!decoded || !decoded.sub || !decoded.email) {
+        if (!decoded || !decoded.sub) {
             return res.status(401).json({ error: 'Invalid token structure' });
         }
 
         // Add user info to request
         req.user = {
             id: decoded.sub,
-            email: decoded.email
+            email: decoded.email || decoded.user_metadata?.email || ''
         };
 
         console.log('[Auth] User authenticated:', req.user.email);
