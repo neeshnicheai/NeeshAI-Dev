@@ -66,6 +66,21 @@ app.put('/api/projects/:projectId/blog', (req, res) => blogController.upsertBlog
 // Public blog endpoint (no auth required)
 app.get('/api/public/projects/:projectId/blog', (req, res) => blogController.getPublicBlog(req, res));
 
+// Audience routes (authenticated)
+import { AudienceController } from './controllers/AudienceController';
+const audienceController = new AudienceController();
+
+app.get('/api/projects/:projectId/audience', (req, res) => audienceController.getAudience(req, res));
+app.post('/api/public/projects/:projectId/feedback', (req, res) => audienceController.submitPublicFeedback(req, res));
+
+// User / subscription routes (authenticated)
+import { UserController } from './controllers/UserController';
+const userController = new UserController();
+
+app.get('/api/users/subscription', (req, res) => userController.getSubscription(req, res));
+app.put('/api/users/subscription/upgrade', (req, res) => userController.upgradeToPro(req, res));
+app.put('/api/users/branding', (req, res) => userController.updateBranding(req, res));
+
 // API Key management routes
 import { ApiKeyController } from './controllers/ApiKeyController';
 const apiKeyController = new ApiKeyController();
