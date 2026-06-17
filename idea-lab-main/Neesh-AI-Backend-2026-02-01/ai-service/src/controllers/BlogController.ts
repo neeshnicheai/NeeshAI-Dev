@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { randomUUID } from 'crypto';
 
 export class BlogController {
 
@@ -97,7 +98,7 @@ export class BlogController {
             } else {
                 const { data, error } = await supabase
                     .from('blogs')
-                    .insert({ ...blogData, created_at: new Date().toISOString() })
+                    .insert({ ...blogData, id: randomUUID(), created_at: new Date().toISOString() })
                     .select()
                     .single();
                 if (error) throw error;
