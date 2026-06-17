@@ -192,9 +192,10 @@ const Project = () => {
         console.log("[Blog Load] Custom fields:", blog.custom_fields);
 
         // Start with intro and content sections
+        // Fall back to project fields if blog hasn't been saved yet
         const loadedSections: typeof sections = [
-          { id: "1", title: "Introduction", content: blog.introduction || "", type: "text" },
-          { id: "2", title: "Content", content: blog.content || "", type: "text" },
+          { id: "1", title: "Introduction", content: blog.introduction || project?.introduction || "", type: "text" },
+          { id: "2", title: "Content", content: blog.content || project?.description || "", type: "text" },
         ];
 
         // Add custom fields as sections (including feedback)
