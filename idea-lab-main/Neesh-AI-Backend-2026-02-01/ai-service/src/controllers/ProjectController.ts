@@ -202,6 +202,9 @@ export class ProjectController {
             const { id } = req.params;
             console.log('[ProjectController] Deleting project:', id);
 
+            // Delete blog first to avoid FK constraint violation
+            await supabase.from('blogs').delete().eq('project_id', id);
+
             const { error } = await supabase
                 .from('projects')
                 .delete()
