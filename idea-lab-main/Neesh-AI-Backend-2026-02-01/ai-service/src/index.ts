@@ -89,6 +89,69 @@ app.get('/api/user/api-keys', (req, res) => apiKeyController.getUserApiKeys(req,
 app.post('/api/user/api-keys', (req, res) => apiKeyController.saveApiKey(req, res));
 app.delete('/api/user/api-keys/:provider', (req, res) => apiKeyController.deleteApiKey(req, res));
 
+// Notifications stub routes (not yet implemented)
+app.get('/api/projects/:projectId/notifications', (req, res) => {
+    res.json({ clusters: [], count: 0, unansweredCount: 0 });
+});
+app.get('/api/projects/:projectId/notifications/count', (req, res) => {
+    res.json({ count: 0 });
+});
+app.get('/api/notifications/clusters/:clusterId', (req, res) => {
+    res.status(404).json({ error: 'Not found' });
+});
+app.post('/api/notifications/clusters/:clusterId/reply', (req, res) => {
+    res.json({ clusterId: req.params.clusterId, answeredCount: 0, totalCount: 0, clusterStatus: 'unanswered' });
+});
+
+// FAQ stub routes
+app.get('/api/projects/:projectId/faqs', (req, res) => {
+    res.json({ faqs: [], count: 0 });
+});
+app.post('/api/projects/:projectId/faqs', (req, res) => {
+    res.status(501).json({ error: 'Not implemented' });
+});
+app.put('/api/faqs/:faqId', (req, res) => {
+    res.status(501).json({ error: 'Not implemented' });
+});
+app.delete('/api/faqs/:faqId', (req, res) => {
+    res.json({ success: true });
+});
+
+// Questions stub routes
+app.get('/api/projects/:projectId/questions/unanswered', (req, res) => {
+    res.json({ questions: [], count: 0 });
+});
+app.put('/api/questions/:questionId/resolve', (req, res) => {
+    res.json({ success: true });
+});
+
+// Links stub routes
+app.get('/api/projects/:projectId/links', (req, res) => {
+    res.json([]);
+});
+app.post('/api/projects/:projectId/links', (req, res) => {
+    res.status(501).json({ error: 'Not implemented' });
+});
+app.delete('/api/projects/:projectId/links/:linkId', (req, res) => {
+    res.json({ success: true });
+});
+
+// Promotions stub routes
+app.get('/api/promotions', (req, res) => {
+    res.json([]);
+});
+app.post('/api/promotions', (req, res) => {
+    res.status(501).json({ error: 'Not implemented' });
+});
+app.delete('/api/promotions/:promotionId', (req, res) => {
+    res.json({ success: true });
+});
+
+// Blog branding stub route
+app.get('/api/public/blog-branding/:projectId', (req, res) => {
+    res.json({ botName: null, botAvatarUrl: null });
+});
+
 // Public health check endpoint
 app.get('/', (req, res) => {
     res.json({
