@@ -18,16 +18,18 @@ public class AudienceDTOs {
                         Double engagementScore,
                         String feedbackSummary,
                         Instant firstInteractionAt,
-                        Instant lastInteractionAt) {
+                        Instant lastInteractionAt,
+                        int questionCount) {
                 public static AudienceMemberSummary fromEntity(AudienceMember m) {
                         String summary = m.getFeedbackText();
                         if (summary != null && summary.length() > 100) {
                                 summary = summary.substring(0, 100) + "...";
                         }
+                        int qCount = m.getQuestions() != null ? m.getQuestions().size() : 0;
                         return new AudienceMemberSummary(
                                         m.getId(), m.getName(), m.getEmail(), m.getOccupation(),
                                         m.getPersonaType(), m.getConfidenceScore(), m.getEngagementScore(),
-                                        summary, m.getFirstInteractionAt(), m.getLastInteractionAt());
+                                        summary, m.getFirstInteractionAt(), m.getLastInteractionAt(), qCount);
                 }
         }
 

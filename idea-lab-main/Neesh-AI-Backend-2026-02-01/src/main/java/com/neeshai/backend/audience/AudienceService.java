@@ -36,6 +36,7 @@ public class AudienceService {
     /**
      * List all audience members for a project.
      */
+    @Transactional(readOnly = true)
     public AudienceDTOs.AudienceMemberListResponse getAudienceMembers(UUID projectId) {
         List<AudienceMember> members = memberRepository.findByProjectIdOrderByLastInteractionAtDesc(projectId);
         List<AudienceDTOs.AudienceMemberSummary> summaries = members.stream()
