@@ -3,7 +3,7 @@ import { Check, Zap, Crown, Building2, Sparkles, Loader2, PartyPopper } from "lu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { NeeshLogo } from "@/components/NeeshLogo";
 import { BetaBadge } from "@/components/BetaBadge";
 import { useNavigate } from "react-router-dom";

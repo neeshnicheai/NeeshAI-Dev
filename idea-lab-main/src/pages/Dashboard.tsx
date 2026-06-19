@@ -62,7 +62,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, type Project } from "@/hooks/useProjects";
 import { useProfile } from "@/hooks/useProfile";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { usePromotions } from "@/hooks/usePromotions";
 import { usePaymentVerification } from "@/hooks/usePayments";
 import { toast } from "sonner";
@@ -238,7 +238,6 @@ const Dashboard = () => {
     if (success) {
       setUpgradeOpen(false);
       setBetaUpgradeSuccess(true);
-      refetchSubscription();
     } else {
       toast.error("Failed to upgrade. Please try again.");
     }

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, type UpdateProfileData } from "@/hooks/useProfile";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { toast } from "sonner";
 import { NeeshLogo } from "@/components/NeeshLogo";
 
