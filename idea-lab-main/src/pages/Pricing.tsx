@@ -24,7 +24,7 @@ const Pricing = () => {
     setIsUpgrading(false);
     if (success) {
       setSuccessOpen(true);
-      refetch();
+      refetch(true);
     } else {
       toast.error("Failed to upgrade. Please try again.");
     }

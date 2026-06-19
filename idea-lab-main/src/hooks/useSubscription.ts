@@ -29,12 +29,13 @@ export const useSubscription = () => {
       return;
     }
 
-    // Skip if already fetched for this user
+    // Skip if already fetched for this user (bypass when forced)
     if (!force && lastFetchedUserIdRef.current === user.id) {
       return;
     }
 
-    if (isFetchingRef.current) return;
+    // Skip if a fetch is already in flight (bypass when forced)
+    if (!force && isFetchingRef.current) return;
     isFetchingRef.current = true;
 
     try {
@@ -44,7 +45,6 @@ export const useSubscription = () => {
       lastFetchedUserIdRef.current = user.id;
     } catch (err) {
       console.error("[useSubscription] Error fetching subscription:", err);
-      // Default to free plan on error
       setSubscription({
         plan: "FREE",
         projectCount: 0,
