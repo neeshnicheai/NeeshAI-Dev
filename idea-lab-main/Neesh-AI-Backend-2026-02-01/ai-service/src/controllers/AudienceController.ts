@@ -20,13 +20,13 @@ export class AudienceController {
                 name: m.name,
                 email: m.email,
                 occupation: m.occupation || null,
-                personaType: m.detected_persona || null,
-                confidenceScore: m.persona_confidence || null,
-                engagementScore: null,
-                feedbackSummary: null,
+                personaType: m.persona_type || null,
+                confidenceScore: m.confidence_score || null,
+                engagementScore: m.engagement_score || null,
+                feedbackSummary: m.feedback_text ? m.feedback_text.substring(0, 100) : null,
                 firstInteractionAt: m.first_interaction_at,
                 lastInteractionAt: m.last_interaction_at,
-                questionCount: m.total_questions || 0,
+                questionCount: 0,
             }));
 
             res.json({ members: result, count: result.length });
@@ -49,7 +49,7 @@ export class AudienceController {
 
             const { data: existing, error: findError } = await supabase
                 .from('audience_members')
-                .select('id, total_questions, total_feedback')
+                .select('id')
                 .eq('project_id', projectId)
                 .eq('email', resolvedEmail)
                 .maybeSingle();
@@ -64,9 +64,10 @@ export class AudienceController {
                     .update({
                         name: resolvedName,
                         occupation: occupation || null,
-                        total_feedback: (existing.total_feedback || 0) + 1,
+                        feedback_text: feedbackText || null,
+                        feedback_source: 'Blog',
+                        feedback_submitted_at: now,
                         last_interaction_at: now,
-                        updated_at: now,
                     })
                     .eq('id', existing.id);
                 if (updateError) {
@@ -80,11 +81,11 @@ export class AudienceController {
                         name: resolvedName,
                         email: resolvedEmail,
                         occupation: occupation || null,
-                        total_questions: 0,
-                        total_feedback: 1,
+                        feedback_text: feedbackText || null,
+                        feedback_source: 'Blog',
+                        feedback_submitted_at: now,
                         first_interaction_at: now,
                         last_interaction_at: now,
-                        updated_at: now,
                     });
                 if (insertError) {
                     console.error('[AudienceController] Error inserting member:', insertError);
