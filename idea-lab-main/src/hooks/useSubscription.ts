@@ -67,7 +67,7 @@ export const useSubscription = () => {
   const upgradeToPro = async (): Promise<boolean> => {
     try {
       await apiClient.put('/api/users/subscription/upgrade');
-      await fetchSubscription();
+      await fetchSubscription(true);
       return true;
     } catch (err) {
       console.error("[useSubscription] Error upgrading:", err);
@@ -78,7 +78,7 @@ export const useSubscription = () => {
   const updateBranding = async (customLogoUrl?: string, customBrandingText?: string): Promise<boolean> => {
     try {
       await apiClient.put('/api/users/branding', { customLogoUrl, customBrandingText });
-      await fetchSubscription();
+      await fetchSubscription(true);
       return true;
     } catch (err) {
       console.error("[useSubscription] Error updating branding:", err);
