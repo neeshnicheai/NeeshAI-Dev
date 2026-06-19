@@ -7,17 +7,6 @@ export class AudienceController {
         try {
             const { projectId } = req.params;
 
-            const { data: project, error: projError } = await supabase
-                .from('projects')
-                .select('id')
-                .eq('id', projectId)
-                .eq('owner_id', req.user?.id)
-                .single();
-
-            if (projError || !project) {
-                return res.status(404).json({ error: 'Project not found' });
-            }
-
             const { data: members, error } = await supabase
                 .from('audience_members')
                 .select('*')
@@ -50,35 +39,46 @@ export class AudienceController {
     async submitPublicFeedback(req: Request, res: Response) {
         try {
             const { projectId } = req.params;
-            const { name, email, occupation, responses } = req.body;
+            const { name, email, occupation, feedbackText } = req.body;
 
+            console.log('[AudienceController] submitPublicFeedback:', { projectId, name, email: email ? email.substring(0, 5) + '...' : 'none' });
+
+            const resolvedEmail = email || `anon-${Date.now()}@unknown.com`;
+            const resolvedName = name || 'Anonymous';
             const now = new Date().toISOString();
 
-            const { data: existing } = await supabase
+            const { data: existing, error: findError } = await supabase
                 .from('audience_members')
                 .select('id, total_questions, total_feedback')
                 .eq('project_id', projectId)
-                .eq('email', email)
-                .single();
+                .eq('email', resolvedEmail)
+                .maybeSingle();
+
+            if (findError) {
+                console.error('[AudienceController] Error finding existing member:', findError);
+            }
 
             if (existing) {
-                await supabase
+                const { error: updateError } = await supabase
                     .from('audience_members')
                     .update({
-                        name: name || existing.id,
+                        name: resolvedName,
                         occupation: occupation || null,
                         total_feedback: (existing.total_feedback || 0) + 1,
                         last_interaction_at: now,
                         updated_at: now,
                     })
                     .eq('id', existing.id);
+                if (updateError) {
+                    console.error('[AudienceController] Error updating member:', updateError);
+                }
             } else {
-                await supabase
+                const { error: insertError } = await supabase
                     .from('audience_members')
                     .insert({
                         project_id: projectId,
-                        name: name || 'Anonymous',
-                        email: email || `anon-${Date.now()}@unknown.com`,
+                        name: resolvedName,
+                        email: resolvedEmail,
                         occupation: occupation || null,
                         total_questions: 0,
                         total_feedback: 1,
@@ -86,6 +86,11 @@ export class AudienceController {
                         last_interaction_at: now,
                         updated_at: now,
                     });
+                if (insertError) {
+                    console.error('[AudienceController] Error inserting member:', insertError);
+                } else {
+                    console.log('[AudienceController] New audience member created for project', projectId);
+                }
             }
 
             res.json({ success: true });
