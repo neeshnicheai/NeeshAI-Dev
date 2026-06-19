@@ -128,11 +128,18 @@ public class UserService {
 
     /**
      * Upgrade user to Pro plan.
+     * If the user row doesn't exist yet (new sign-up race condition), create a
+     * minimal record first using the JWT claims so the upgrade never fails with "User not found".
      */
     @Transactional
-    public UserDTO upgradeToPro(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    public UserDTO upgradeToPro(UUID userId, String email, String name) {
+        User user = userRepository.findById(userId).orElseGet(() -> {
+            log.warn("User {} not found during upgradeToPro — upserting from JWT claims", userId);
+            String safeEmail = (email != null && !email.isBlank()) ? email : userId + "@unknown.invalid";
+            userRepository.upsertUser(userId, safeEmail, name);
+            return userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found after upsert"));
+        });
         user.setSubscriptionPlan("PRO");
         user.setSubscriptionExpiresAt(ZonedDateTime.now().plusDays(30));
         User saved = userRepository.save(user);

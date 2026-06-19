@@ -1,6 +1,8 @@
 package com.neeshai.backend.user;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -57,8 +59,21 @@ public class UserController {
             return ResponseEntity.status(401).build();
         }
         UUID userId = UUID.fromString(principal.getName());
+        String email = null;
+        String name = null;
+        if (principal instanceof JwtAuthenticationToken jwtToken) {
+            Jwt jwt = jwtToken.getToken();
+            email = jwt.getClaimAsString("email");
+            name = jwt.getClaimAsString("name");
+            if (name == null && jwt.hasClaim("user_metadata")) {
+                var metadata = jwt.getClaimAsMap("user_metadata");
+                if (metadata != null) {
+                    name = (String) metadata.getOrDefault("name", metadata.get("full_name"));
+                }
+            }
+        }
         try {
-            UserDTO updated = userService.upgradeToPro(userId);
+            UserDTO updated = userService.upgradeToPro(userId, email, name);
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

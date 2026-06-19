@@ -114,7 +114,9 @@ public class PaymentController {
             boolean isPaid = cashfreeService.verifyPayment(orderId);
             if (isPaid) {
                 UUID userId = UUID.fromString(jwt.getSubject());
-                UserDTO updatedUser = userService.upgradeToPro(userId);
+                String email = jwt.getClaimAsString("email");
+                String name = jwt.getClaimAsString("name");
+                UserDTO updatedUser = userService.upgradeToPro(userId, email, name);
                 log.info("User {} successfully upgraded to PRO after payment verify", userId);
                 return ResponseEntity.ok(Map.of("status", "SUCCESS", "user", updatedUser));
             } else {
