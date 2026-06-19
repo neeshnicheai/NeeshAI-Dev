@@ -66,12 +66,9 @@ export const useSubscription = () => {
 
   const upgradeToPro = async (): Promise<boolean> => {
     try {
-      console.log("[useSubscription] Calling PUT /api/users/subscription/upgrade");
-      const result = await apiClient.put('/api/users/subscription/upgrade');
-      console.log("[useSubscription] Upgrade API response:", result);
-      console.log("[useSubscription] Calling fetchSubscription(true)");
-      await fetchSubscription(true);
-      console.log("[useSubscription] fetchSubscription done, subscription state:", subscription?.plan);
+      await apiClient.put('/api/users/subscription/upgrade');
+      setSubscription(prev => prev ? { ...prev, plan: 'PRO', maxProjects: -1, canCreateProject: true } : prev);
+      lastFetchedUserIdRef.current = null;
       return true;
     } catch (err) {
       console.error("[useSubscription] Error upgrading:", err);

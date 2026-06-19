@@ -20,15 +20,10 @@ const Pricing = () => {
 
   const handleBetaUpgrade = async () => {
     setIsUpgrading(true);
-    console.log("[Pricing] Starting upgrade, current plan:", subscription?.plan);
     const success = await upgradeToPro();
-    console.log("[Pricing] upgradeToPro returned:", success, "subscription now:", subscription?.plan);
     setIsUpgrading(false);
     if (success) {
       setSuccessOpen(true);
-      console.log("[Pricing] Calling refetch(true)...");
-      await refetch(true);
-      console.log("[Pricing] After refetch, subscription:", subscription?.plan);
     } else {
       toast.error("Failed to upgrade. Please try again.");
     }
