@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase';
 import { randomUUID } from 'crypto';
 
 interface ApiKeyRequest {
-    provider: 'GEMINI' | 'OPENAI';
+    provider: string;
     apiKey: string;
 }
 
@@ -49,11 +49,11 @@ export class ApiKeyController {
                 return res.status(400).json({ error: 'Provider and API key are required' });
             }
 
-            if (!['GEMINI', 'OPENAI'].includes(provider)) {
-                return res.status(400).json({ error: 'Invalid provider. Must be GEMINI or OPENAI' });
+            if (typeof provider !== 'string' || provider.trim().length === 0) {
+                return res.status(400).json({ error: 'Invalid provider' });
             }
 
-            if (apiKey.length < 10 || apiKey.length > 200) {
+            if (apiKey.length < 10 || apiKey.length > 500) {
                 return res.status(400).json({ error: 'Invalid API key format' });
             }
 
@@ -117,7 +117,7 @@ export class ApiKeyController {
 
             console.log('[ApiKeyController] Deleting API key for provider:', provider);
 
-            if (!['GEMINI', 'OPENAI'].includes(provider)) {
+            if (!provider || typeof provider !== 'string') {
                 return res.status(400).json({ error: 'Invalid provider' });
             }
 

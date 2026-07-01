@@ -1,95 +1,88 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ChatService } from '../services/ChatService';
+import { CacheService } from '../services/CacheService';
 
-interface ChatRequest {
-    query: string;
-    conversationHistory?: Array<{
-        role: 'user' | 'assistant';
-        content: string;
-    }>;
-}
+const SUPPORTED_LLM_PROVIDERS = new Set([
+    'OPENROUTER', 'OPENAI', 'CLAUDE', 'GEMINI',
+    'GEMINI_25_PRO', 'GEMINI_25_FLASH', 'GEMINI_20_FLASH', 'GEMINI_20_FLASH_LITE',
+    'GEMINI_15_PRO', 'GEMINI_15_FLASH',
+]);
+
+const GEMINI_VARIANTS = new Set([
+    'GEMINI', 'GEMINI_25_PRO', 'GEMINI_25_FLASH',
+    'GEMINI_20_FLASH', 'GEMINI_20_FLASH_LITE', 'GEMINI_15_PRO', 'GEMINI_15_FLASH',
+]);
 
 export class ChatController {
-    private async getUserApiKey(userId: string, provider: 'GEMINI' | 'OPENAI'): Promise<string | null> {
-        try {
-            const { data: apiKey, error } = await supabase
-                .from('user_api_keys')
-                .select('encrypted_api_key')
-                .eq('user_id', userId)
-                .eq('provider', provider)
-                .single();
+    private chatService: ChatService;
+    private cacheService: CacheService;
 
-            if (error || !apiKey) {
-                return null;
+    constructor() {
+        this.cacheService = new CacheService();
+        this.chatService = new ChatService();
+        console.log('[ChatController] Initialized with full RAG pipeline');
+    }
+
+    private async getUserApiKey(userId: string): Promise<{ provider: string; apiKey: string } | null> {
+        try {
+            const { data: apiKeys, error } = await supabase
+                .from('user_api_keys')
+                .select('provider, encrypted_api_key')
+                .eq('user_id', userId)
+                .order('updated_at', { ascending: false });
+
+            if (error || !apiKeys || apiKeys.length === 0) return null;
+
+            // Priority: OPENROUTER > OPENAI > CLAUDE > any GEMINI variant
+            const priority = ['OPENROUTER', 'OPENAI', 'CLAUDE'];
+            for (const p of priority) {
+                const found = apiKeys.find(k => k.provider === p && k.encrypted_api_key);
+                if (found) return { provider: found.provider, apiKey: found.encrypted_api_key };
             }
 
-            // In production, decrypt the API key here
-            // For now, assuming it's stored as plain text (not recommended)
-            return apiKey.encrypted_api_key;
-        } catch (error) {
-            console.error(`[ChatController] Error getting ${provider} API key:`, error);
+            // Fallback to first Gemini variant found
+            const gemini = apiKeys.find(k => GEMINI_VARIANTS.has(k.provider) && k.encrypted_api_key);
+            if (gemini) return { provider: 'GEMINI', apiKey: gemini.encrypted_api_key };
+
+            // Fallback: first available supported LLM key
+            const any = apiKeys.find(k => SUPPORTED_LLM_PROVIDERS.has(k.provider) && k.encrypted_api_key);
+            if (any) return { provider: any.provider, apiKey: any.encrypted_api_key };
+
+            return null;
+        } catch (err) {
+            console.error('[ChatController] Error fetching user API key:', err);
             return null;
         }
     }
 
-    private async getProjectContext(projectId: string): Promise<string> {
+    private async getLinkedProjectIds(projectId: string): Promise<string[]> {
         try {
-            // Get project details
-            const { data: project, error: projectError } = await supabase
-                .from('projects')
-                .select('title, one_line_summary, description, introduction')
-                .eq('id', projectId)
-                .single();
-
-            if (projectError || !project) {
-                return '';
-            }
-
-            // Get project documents
-            const { data: documents, error: docsError } = await supabase
-                .from('documents')
-                .select('original_filename, content')
-                .eq('project_id', projectId)
-                .eq('is_active', true);
-
-            let context = `Project: ${project.title}\n`;
-            if (project.one_line_summary) context += `Summary: ${project.one_line_summary}\n`;
-            if (project.description) context += `Description: ${project.description}\n`;
-            if (project.introduction) context += `Introduction: ${project.introduction}\n\n`;
-
-            if (documents && documents.length > 0) {
-                context += `Project Documents:\n`;
-                documents.forEach(doc => {
-                    context += `\n--- ${doc.original_filename} ---\n`;
-                    context += doc.content?.substring(0, 2000) || 'No content available';
-                    context += '\n';
-                });
-            }
-
-            return context;
-        } catch (error) {
-            console.error('[ChatController] Error getting project context:', error);
-            return '';
+            const { data } = await supabase
+                .from('project_links')
+                .select('linked_project_id')
+                .eq('project_id', projectId);
+            return (data || []).map((r: any) => r.linked_project_id).filter(Boolean);
+        } catch {
+            return [];
         }
     }
 
     async chatWithProject(req: Request, res: Response) {
         try {
             const { id: projectId } = req.params;
-            const { query, conversationHistory = [] }: ChatRequest = req.body;
+            const { query, sessionId } = req.body;
 
-            console.log('[ChatController] Chat request for project:', projectId);
+            console.log(`[ChatController] Authenticated chat — project: ${projectId}, user: ${req.user?.id}`);
 
             if (!query || query.trim().length === 0) {
                 return res.status(400).json({ error: 'Query is required' });
             }
-
             if (query.length > 2000) {
                 return res.status(400).json({ error: 'Query too long (max 2000 characters)' });
             }
 
-            // Verify project exists and user has access
+            // Verify project belongs to user
             const { data: project, error: projectError } = await supabase
                 .from('projects')
                 .select('id, title')
@@ -101,80 +94,56 @@ export class ChatController {
                 return res.status(404).json({ error: 'Project not found' });
             }
 
-            // Get user's Gemini API key or use system default
-            const userGeminiKey = await this.getUserApiKey(req.user?.id!, 'GEMINI');
-            const geminiApiKey = userGeminiKey || process.env.GEMINI_API_KEY;
+            // Resolve user's LLM provider + key, fall back to env fallback in ChatService
+            const userKey = await this.getUserApiKey(req.user!.id);
 
-            if (!geminiApiKey) {
-                return res.status(400).json({
-                    error: 'No Gemini API key available. Please add your API key in settings.'
-                });
-            }
+            const [linkedProjectIds] = await Promise.all([
+                this.getLinkedProjectIds(projectId),
+            ]);
 
-            console.log('[ChatController] Using Gemini API key:', geminiApiKey ? 'Present' : 'Missing');
-            console.log('[ChatController] Key source:', userGeminiKey ? 'User' : 'System');
-
-            // Get project context
-            const projectContext = await this.getProjectContext(projectId);
-
-            // Initialize Gemini with working model from your API key
-            const genAI = new GoogleGenerativeAI(geminiApiKey);
-            const model = genAI.getGenerativeModel({ model: 'models/gemini-2.5-flash' });
-
-            // Build conversation context
-            let conversationContext = '';
-            if (conversationHistory.length > 0) {
-                conversationContext = conversationHistory
-                    .slice(-10) // Keep last 10 messages for context
-                    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-                    .join('\n');
-                conversationContext += '\n\n';
-            }
-
-            // Create prompt
-            const prompt = `You are an AI assistant helping users understand and work with their project: "${project.title}".
-
-Project Context:
-${projectContext}
-
-Previous Conversation:
-${conversationContext}
-
-Current User Question: ${query}
-
-Please provide a helpful, accurate response based on the project context and conversation history. If the question is not related to the project, politely redirect the user to project-related topics.`;
-
-            const result = await model.generateContent(prompt);
-            const response = result.response;
-            const answer = response.text();
-
-            console.log('[ChatController] Generated response length:', answer.length);
-
-            res.json({
-                answer,
+            const response = await this.chatService.askQuestion(
                 projectId,
-                query,
-                timestamp: new Date().toISOString()
-            });
+                query.trim(),
+                linkedProjectIds,
+                userKey?.provider,
+                userKey?.apiKey,
+                req.user?.email,
+                req.user?.email,
+            );
 
-        } catch (error) {
-            console.error('[ChatController] Error in chat:', error);
-            res.status(500).json({ error: 'Failed to generate response' });
+            return res.json(response);
+
+        } catch (error: any) {
+            console.error('[ChatController] Chat error:', error.message);
+
+            const isProviderError =
+                error.message?.includes('API key') ||
+                error.message?.includes('rate limit') ||
+                error.message?.includes('quota') ||
+                error.message?.includes('not configured');
+
+            return res.status(isProviderError ? 400 : 500).json({
+                error: error.message || 'Failed to generate response',
+                providerError: isProviderError,
+            });
         }
     }
 
     async publicChatWithProject(req: Request, res: Response) {
         try {
             const { id: projectId } = req.params;
-            const { query }: ChatRequest = req.body;
+            const { query, sessionId } = req.body;
 
-            console.log('[ChatController] Public chat request for project:', projectId);
+            console.log(`[ChatController] Public chat — project: ${projectId}`);
 
             if (!query || query.trim().length === 0) {
                 return res.status(400).json({ error: 'Query is required' });
             }
+            if (query.length > 2000) {
+                return res.status(400).json({ error: 'Query too long (max 2000 characters)' });
+            }
 
-            // Verify project exists (no user auth required for public endpoint)
+            // Verify project is publicly accessible
             const { data: project, error: projectError } = await supabase
                 .from('projects')
                 .select('id, title')
@@ -185,46 +154,25 @@ Please provide a helpful, accurate response based on the project context and con
                 return res.status(404).json({ error: 'Project not found' });
             }
 
-            // Use system Gemini API key for public chats
-            const geminiApiKey = process.env.GEMINI_API_KEY;
+            // Public chat: use env fallback (OPENROUTER_API_KEY / GEMINI_API_KEY) — no user key
+            const linkedProjectIds = await this.getLinkedProjectIds(projectId);
 
-            if (!geminiApiKey) {
-                return res.status(500).json({
-                    error: 'Chat service temporarily unavailable'
-                });
-            }
-
-            // Get project context
-            const projectContext = await this.getProjectContext(projectId);
-
-            // Initialize Gemini with most basic model name
-            const genAI = new GoogleGenerativeAI(geminiApiKey);
-            const model = genAI.getGenerativeModel({ model: 'models/gemini-1.5-flash' });
-
-            // Create prompt for public chat (simpler, no conversation history)
-            const prompt = `You are a chatbot for the project: "${project.title}".
-
-Project Information:
-${projectContext}
-
-User Question: ${query}
-
-Please provide a helpful response about this project. Keep it concise and relevant to the project.`;
-
-            const result = await model.generateContent(prompt);
-            const response = result.response;
-            const answer = response.text();
-
-            res.json({
-                answer,
+            const response = await this.chatService.askQuestion(
                 projectId,
-                query,
-                timestamp: new Date().toISOString()
-            });
+                query.trim(),
+                linkedProjectIds,
+                undefined,
+                undefined,
+            );
 
-        } catch (error) {
-            console.error('[ChatController] Error in public chat:', error);
-            res.status(500).json({ error: 'Failed to generate response' });
+            return res.json(response);
+
+        } catch (error: any) {
+            console.error('[ChatController] Public chat error:', error.message);
+
+            return res.status(500).json({
+                error: 'Chat service temporarily unavailable. Please try again.',
+            });
         }
     }
 }

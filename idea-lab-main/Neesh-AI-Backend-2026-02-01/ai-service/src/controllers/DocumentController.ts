@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { randomUUID } from 'crypto';
 import multer from 'multer';
+import { IngestionService } from '../services/IngestionService';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -14,6 +15,18 @@ const upload = multer({
 export const uploadMiddleware = upload.single('file');
 
 export class DocumentController {
+    private ingestionService: IngestionService;
+
+    constructor() {
+        this.ingestionService = new IngestionService();
+    }
+
+    private triggerIngestion(projectId: string): void {
+        this.ingestionService.ingestProject(projectId).catch(err =>
+            console.error(`[DocumentController] Background ingestion failed for ${projectId}:`, err.message)
+        );
+    }
+
     async getProjectDocuments(req: Request, res: Response) {
         try {
             const { projectId } = req.params;
@@ -123,6 +136,11 @@ export class DocumentController {
 
             console.log('[DocumentController] Document uploaded:', document.id);
             res.status(201).json(document);
+
+            // Trigger RAG ingestion in background (non-blocking)
+            console.log(`[DocumentController] Triggering background ingestion for project ${projectId}`);
+            this.triggerIngestion(projectId);
+
         } catch (error) {
             console.error('[DocumentController] Error uploading document:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -192,6 +210,12 @@ export class DocumentController {
 
             console.log('[DocumentController] Document replaced:', documentId);
             res.json(updatedDocument);
+
+            // Trigger RAG re-ingestion in background (non-blocking)
+            const replacedProjectId = document.project_id;
+            console.log(`[DocumentController] Triggering background re-ingestion for project ${replacedProjectId}`);
+            this.triggerIngestion(replacedProjectId);
+
         } catch (error) {
             console.error('[DocumentController] Error replacing document:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -215,9 +239,11 @@ export class DocumentController {
                 return res.status(404).json({ error: 'Project not found' });
             }
 
-            // For now, just return success - in production this would trigger re-processing
-            console.log('[DocumentController] Documents refreshed for project:', projectId);
+            console.log('[DocumentController] Documents refresh triggered for project:', projectId);
             res.json({ message: 'Documents refresh initiated', projectId });
+
+            // Trigger full re-ingestion in background (non-blocking)
+            this.triggerIngestion(projectId);
         } catch (error) {
             console.error('[DocumentController] Error refreshing documents:', error);
             res.status(500).json({ error: 'Internal server error' });
